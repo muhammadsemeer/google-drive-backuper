@@ -1,0 +1,16 @@
+{
+  "name": "google-drive-backuper",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "googleapis": "^144.0.0",
+    "prettier": "^3.4.2"
+  }
+}
