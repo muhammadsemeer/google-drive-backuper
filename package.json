@@ -10,6 +10,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "chokidar": "^4.0.3",
     "commander": "^13.0.0",
     "dotenv": "^16.4.7",
     "googleapis": "^144.0.0",

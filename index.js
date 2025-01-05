@@ -2,10 +2,12 @@ require("dotenv").config();
 const fs = require("fs");
 const { google } = require("googleapis");
 const { Command } = require("commander");
+const chokidar = require("chokidar");
 const { version } = require("./package.json");
 
 // Load API credentials from JSON file
 const apiKeys = require("./api-key.json");
+const path = require("path");
 
 // Define the scope for Google Drive API
 const SCOPES = ["https://www.googleapis.com/auth/drive"];
@@ -127,6 +129,58 @@ const upload = async (uploadFileName) => {
 	}
 };
 
+const backup = async (configFilePath) => {
+	const isFileExists = isFileExistsAndNotADirectory(configFilePath);
+	const isJSON = path.extname(configFilePath) === ".json";
+
+	if (!isFileExists) {
+		return console.error("File does not exist or it's a directory");
+	}
+
+	if (!isJSON) {
+		return console.error("Config file must be a JSON");
+	}
+
+	const config = JSON.parse(fs.readFileSync(configFilePath, "utf-8"));
+
+	const authClient = await authorize();
+	const driveFileList = await listFiles(authClient, process.env.FOLDER_ID);
+
+	for (const filePath of config.files) {
+		if (!isFileExistsAndNotADirectory(filePath)) {
+			console.log(
+				`Skipping file ${filePath}, Because file does not exist or it's a directory`,
+			);
+			continue;
+		}
+		console.log(`Waiting for changes to ${filePath}`);
+
+		const isExistsInDrive = driveFileList.find(
+			(file) => file.name === path.basename(filePath),
+		);
+
+		if (!isExistsInDrive) {
+			try {
+				console.log(`Creating file ${filePath}`);
+				await uploadFile(authClient, filePath, process.env.FOLDER_ID);
+				console.log(`${filePath} created in drive`);
+			} catch (error) {
+				console.error(`Error creating file: ${filePath}`, error);
+			}
+		}
+
+		chokidar.watch(filePath).on("change", async () => {
+			try {
+				console.log(`Syncing file ${filePath}`);
+				await updateFile(authClient, isExistsInDrive.id, filePath);
+				console.log(`${filePath} synced`);
+			} catch (error) {
+				console.log(`Error updating file ${filePath}`, error);
+			}
+		});
+	}
+};
+
 const main = async () => {
 	const program = new Command();
 
@@ -140,6 +194,12 @@ const main = async () => {
 		.description("Upload a single file")
 		.argument("<file>", "file to upload")
 		.action(upload);
+
+	program
+		.command("backup")
+		.description("Sync files mention in config files")
+		.argument("<config>", "config of backup")
+		.action(backup);
 
 	await program.parseAsync(process.argv);
 };
