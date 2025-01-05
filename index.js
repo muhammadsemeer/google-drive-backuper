@@ -1,9 +1,11 @@
+require("dotenv").config();
 const fs = require("fs");
 const { google } = require("googleapis");
+const { Command } = require("commander");
+const { version } = require("./package.json");
 
 // Load API credentials from JSON file
 const apiKeys = require("./api-key.json");
-const { file } = require("googleapis/build/src/apis/file");
 
 // Define the scope for Google Drive API
 const SCOPES = ["https://www.googleapis.com/auth/drive"];
@@ -95,16 +97,14 @@ const updateFile = async (auth, fileId, filePath) => {
 	}
 };
 
-// Main function to demonstrate file operations
-const main = async () => {
+const isFileExistsAndNotADirectory = (filePath) =>
+	fs.existsSync(filePath) && fs.statSync(filePath).isFile();
+
+const upload = async (uploadFileName) => {
 	try {
-		const args = process.argv.slice(2);
-
-		if (!args.length) {
-			return console.log("File path required.");
+		if (!isFileExistsAndNotADirectory(uploadFileName)) {
+			return console.error("File not exists or it's a directory");
 		}
-
-		const uploadFileName = args[0];
 
 		const authClient = await authorize();
 
@@ -125,6 +125,23 @@ const main = async () => {
 	} catch (error) {
 		console.error(error);
 	}
+};
+
+const main = async () => {
+	const program = new Command();
+
+	program
+		.name("Google Drive Backuper")
+		.description("Watch files and backup and sync to google drive")
+		.version(version);
+
+	program
+		.command("upload")
+		.description("Upload a single file")
+		.argument("<file>", "file to upload")
+		.action(upload);
+
+	await program.parseAsync(process.argv);
 };
 
 main();
