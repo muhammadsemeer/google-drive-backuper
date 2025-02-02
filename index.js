@@ -141,14 +141,14 @@ const syncFiles = async (files) => {
 		}
 		console.log(`Waiting for changes to ${filePath}`);
 
-		const isExistsInDrive = driveFileList.find(
+		let isExistsInDrive = driveFileList.find(
 			(file) => file.name === path.basename(filePath),
 		);
 
 		if (!isExistsInDrive) {
 			try {
 				console.log(`Creating file ${filePath}`);
-				await uploadFile(authClient, filePath, process.env.FOLDER_ID);
+				isExistsInDrive = await uploadFile(authClient, filePath, process.env.FOLDER_ID);
 				console.log(`${filePath} created in drive`);
 			} catch (error) {
 				console.error(`Error creating file: ${filePath}`, error);
@@ -168,20 +168,18 @@ const syncFiles = async (files) => {
 };
 
 const syncFolders = async (folders) => {
-	const files = folders.reduce((acc, folder) => {
+	folders.forEach((folder) => {
 
 		if (!fs.existsSync(folder) || !fs.statSync(folder).isDirectory()) {
 			console.log(`Folder ${folder} does not exist or it's not a directory`);
 			return acc;
 		}
 
-		const files = fs.readdirSync(folder);
-		const filePaths = files.map((file) => path.join(folder, file));
-
-		return [...acc, ...filePaths];
-	}, []);
-
-	await syncFiles(files);
+		chokidar.watch(folder).on("add", async (file) => {
+			console.log(`New file added ${file}`);
+			await syncFiles([file]);
+		});
+	});
 };
 
 const backup = async (configFilePath) => {
