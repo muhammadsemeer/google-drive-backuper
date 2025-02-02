@@ -129,24 +129,10 @@ const upload = async (uploadFileName) => {
 	}
 };
 
-const backup = async (configFilePath) => {
-	const isFileExists = isFileExistsAndNotADirectory(configFilePath);
-	const isJSON = path.extname(configFilePath) === ".json";
-
-	if (!isFileExists) {
-		return console.error("File does not exist or it's a directory");
-	}
-
-	if (!isJSON) {
-		return console.error("Config file must be a JSON");
-	}
-
-	const config = JSON.parse(fs.readFileSync(configFilePath, "utf-8"));
-
+const syncFiles = async (files) => {
 	const authClient = await authorize();
 	const driveFileList = await listFiles(authClient, process.env.FOLDER_ID);
-
-	for (const filePath of config.files) {
+	for (const filePath of files) {
 		if (!isFileExistsAndNotADirectory(filePath)) {
 			console.log(
 				`Skipping file ${filePath}, Because file does not exist or it's a directory`,
@@ -178,6 +164,46 @@ const backup = async (configFilePath) => {
 				console.log(`Error updating file ${filePath}`, error);
 			}
 		});
+	}
+};
+
+const syncFolders = async (folders) => {
+	const files = folders.reduce((acc, folder) => {
+
+		if (!fs.existsSync(folder) || !fs.statSync(folder).isDirectory()) {
+			console.log(`Folder ${folder} does not exist or it's not a directory`);
+			return acc;
+		}
+
+		const files = fs.readdirSync(folder);
+		const filePaths = files.map((file) => path.join(folder, file));
+
+		return [...acc, ...filePaths];
+	}, []);
+
+	await syncFiles(files);
+};
+
+const backup = async (configFilePath) => {
+	const isFileExists = isFileExistsAndNotADirectory(configFilePath);
+	const isJSON = path.extname(configFilePath) === ".json";
+
+	if (!isFileExists) {
+		return console.error("File does not exist or it's a directory");
+	}
+
+	if (!isJSON) {
+		return console.error("Config file must be a JSON");
+	}
+
+	const config = JSON.parse(fs.readFileSync(configFilePath, "utf-8"));
+
+	if (config.files && config.files.length > 0) {
+		await syncFiles(config.files);
+	}
+
+	if (config.folders && config.folders.length > 0) {
+		await syncFolders(config.folders);
 	}
 };
 
